@@ -12,36 +12,28 @@
 
                 <!-- Navigation Links -->
                 <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
-                    <!-- Link Dashboard Utama (Auto-redirect) -->
                     <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                         {{ __('Dashboard') }}
                     </x-nav-link>
 
-                    <!-- Khusus Role: Admin -->
-                    @role('admin')
-                        <x-nav-link :href="route('admin.dashboard')" :active="request()->routeIs('admin.dashboard')">
-                            {{ __('Admin Panel') }}
-                        </x-nav-link>
-                    @endrole
+                    <!-- Menu Wisata (Semua Role) -->
+                    <x-nav-link :href="route('wisata.index')" :active="request()->routeIs('wisata.*')">
+                        {{ __('Destinasi Wisata') }}
+                    </x-nav-link>
 
-                    <!-- Khusus Role: Pengelola -->
-                    @role('pengelola')
-                        <x-nav-link :href="route('pengelola.dashboard')" :active="request()->routeIs('pengelola.dashboard')">
-                            {{ __('Panel Pengelola') }}
-                        </x-nav-link>
-                    @endrole
+                    <!-- Menu Pemesanan Tiket -->
+                    <x-nav-link :href="route('pemesanan.index')" :active="request()->routeIs('pemesanan.*')">
+                        {{ __('Pemesanan Tiket') }}
+                    </x-nav-link>
 
-                    <!-- Khusus Role: Wisatawan -->
-                    @role('wisatawan')
-                        <x-nav-link :href="route('wisatawan.dashboard')" :active="request()->routeIs('wisatawan.dashboard')">
-                            {{ __('Wisatawan') }}
-                        </x-nav-link>
-                    @endrole
-
-                    <!-- Khusus Role: Admin ATAU Pengelola -->
+                    <!-- Menu Khusus Admin & Pengelola -->
                     @hasanyrole('admin|pengelola')
-                        <x-nav-link :href="route('manajemen.ringkasan')" :active="request()->routeIs('manajemen.ringkasan')">
-                            {{ __('Manajemen Bersama') }}
+                        <x-nav-link :href="route('kategori.index')" :active="request()->routeIs('kategori.*')">
+                            {{ __('Kategori') }}
+                        </x-nav-link>
+
+                        <x-nav-link :href="route('laporan.index')" :active="request()->routeIs('laporan.*')">
+                            {{ __('Laporan Rekap') }}
                         </x-nav-link>
                     @endhasanyrole
                 </div>
@@ -75,7 +67,6 @@
                         <!-- Authentication -->
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf
-
                             <x-dropdown-link :href="route('logout')"
                                     onclick="event.preventDefault();
                                                 this.closest('form').submit();">
@@ -88,7 +79,7 @@
 
             <!-- Hamburger -->
             <div class="-me-2 flex items-center sm:hidden">
-                <button @click="open = ! open" class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 dark:text-gray-500 hover:text-gray-500 dark:hover:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-900 focus:outline-none focus:bg-gray-100 dark:focus:bg-gray-900 focus:text-gray-500 dark:focus:text-gray-400 transition duration-150 ease-in-out">
+                <button @click="open = ! open" class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 focus:outline-none">
                     <svg class="h-6 w-6" stroke="currentColor" fill="none" viewBox="0 0 24 24">
                         <path :class="{'hidden': open, 'inline-flex': ! open }" class="inline-flex" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
                         <path :class="{'hidden': ! open, 'inline-flex': open }" class="hidden" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -105,52 +96,37 @@
                 {{ __('Dashboard') }}
             </x-responsive-nav-link>
 
-            @role('admin')
-                <x-responsive-nav-link :href="route('admin.dashboard')" :active="request()->routeIs('admin.dashboard')">
-                    {{ __('Admin Panel') }}
-                </x-responsive-nav-link>
-            @endrole
+            <x-responsive-nav-link :href="route('wisata.index')" :active="request()->routeIs('wisata.*')">
+                {{ __('Destinasi Wisata') }}
+            </x-responsive-nav-link>
 
-            @role('pengelola')
-                <x-responsive-nav-link :href="route('pengelola.dashboard')" :active="request()->routeIs('pengelola.dashboard')">
-                    {{ __('Panel Pengelola') }}
-                </x-responsive-nav-link>
-            @endrole
-
-            @role('wisatawan')
-                <x-responsive-nav-link :href="route('wisatawan.dashboard')" :active="request()->routeIs('wisatawan.dashboard')">
-                    {{ __('Wisatawan') }}
-                </x-responsive-nav-link>
-            @endrole
+            <x-responsive-nav-link :href="route('pemesanan.index')" :active="request()->routeIs('pemesanan.*')">
+                {{ __('Pemesanan Tiket') }}
+            </x-responsive-nav-link>
 
             @hasanyrole('admin|pengelola')
-                <x-responsive-nav-link :href="route('manajemen.ringkasan')" :active="request()->routeIs('manajemen.ringkasan')">
-                    {{ __('Manajemen Bersama') }}
+                <x-responsive-nav-link :href="route('kategori.index')" :active="request()->routeIs('kategori.*')">
+                    {{ __('Kategori') }}
+                </x-responsive-nav-link>
+
+                <x-responsive-nav-link :href="route('laporan.index')" :active="request()->routeIs('laporan.*')">
+                    {{ __('Laporan Rekap') }}
                 </x-responsive-nav-link>
             @endhasanyrole
         </div>
 
-        <!-- Responsive Settings Options -->
         <div class="pt-4 pb-1 border-t border-gray-200 dark:border-gray-600">
             <div class="px-4">
                 <div class="font-medium text-base text-gray-800 dark:text-gray-200">{{ Auth::user()->name }}</div>
                 <div class="font-medium text-sm text-gray-500">{{ Auth::user()->email }}</div>
-                <div class="mt-1">
-                    <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200 uppercase">
-                        Role: {{ Auth::user()->roles->pluck('name')->first() ?? Auth::user()->role }}
-                    </span>
-                </div>
             </div>
 
             <div class="mt-3 space-y-1">
                 <x-responsive-nav-link :href="route('profile.edit')">
                     {{ __('Profile') }}
                 </x-responsive-nav-link>
-
-                <!-- Authentication -->
                 <form method="POST" action="{{ route('logout') }}">
                     @csrf
-
                     <x-responsive-nav-link :href="route('logout')"
                             onclick="event.preventDefault();
                                         this.closest('form').submit();">
