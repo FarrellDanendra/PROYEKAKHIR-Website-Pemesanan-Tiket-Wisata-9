@@ -16,7 +16,9 @@ class Wisata extends Model
     protected $table = 'wisatas';
 
     protected $fillable = [
+        'kode_wisata',
         'kategori_wisata_id',
+        'user_id',
         'nama',
         'slug',
         'deskripsi',
@@ -24,6 +26,7 @@ class Wisata extends Model
         'lokasi',
         'gambar',
         'status_buka',
+        'tanggal_buka',
     ];
 
     /**
@@ -36,6 +39,7 @@ class Wisata extends Model
         return [
             'harga_tiket' => 'decimal:2',
             'status_buka' => 'boolean',
+            'tanggal_buka' => 'date',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];
