@@ -25,6 +25,7 @@ class RoleSeeder extends Seeder
             'verifikasi pemesanan',
             'lihat laporan',
             'pesan tiket',
+            'konfirmasi tiket',
         ];
 
         foreach ($permissions as $permissionName) {
@@ -56,6 +57,11 @@ class RoleSeeder extends Seeder
         $roleWisatawan = Role::firstOrCreate(['name' => 'wisatawan']);
         $roleWisatawan->syncPermissions([
             'pesan tiket',
+        ]);
+
+        $rolePetugas = Role::firstOrCreate(['name' => 'petugas']);
+        $rolePetugas->syncPermissions([
+            'konfirmasi tiket',
         ]);
     }
 }

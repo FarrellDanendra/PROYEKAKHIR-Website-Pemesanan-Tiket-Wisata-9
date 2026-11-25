@@ -4,9 +4,18 @@
     'harga' => 0,
     'statusBuka' => true,
     'gambar' => null,
+    'highlight' => '',
 ])
 
-<div {{ $attributes->merge(['class' => 'flex flex-col bg-white border border-gray-200 rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden']) }}>
+@php
+    $safeNama = e($nama);
+    if (filled($highlight)) {
+        $pattern = '/' . preg_quote(e($highlight), '/') . '/i';
+        $safeNama = preg_replace($pattern, '<mark class="bg-yellow-300 text-gray-900 px-0.5 rounded">$0</mark>', $safeNama);
+    }
+@endphp
+
+<div {{ $attributes->merge(['class' => 'flex flex-col bg-white border border-gray-200 rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden h-full']) }}>
     <div class="relative w-full h-48 bg-gray-100 overflow-hidden">
         @if ($gambar)
             <img src="{{ asset('storage/' . $gambar) }}" alt="{{ $nama }}" class="w-full h-full object-cover">
@@ -40,9 +49,9 @@
     <div class="p-5 flex-1 flex flex-col justify-between">
         <div>
             <h3 class="text-lg font-bold text-gray-900 tracking-tight hover:text-blue-600 transition-colors">
-                {{ $nama }}
+                {!! $safeNama !!}
             </h3>
-            
+
             <p class="mt-1 text-sm font-semibold text-emerald-600">
                 Rp {{ number_format($harga, 0, ',', '.') }} <span class="text-xs text-gray-500 font-normal">/ orang</span>
             </p>

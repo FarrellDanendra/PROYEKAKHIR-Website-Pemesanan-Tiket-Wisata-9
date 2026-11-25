@@ -12,7 +12,6 @@
 
     <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
-            <!-- Kartu Selamat Datang -->
             <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg p-6">
                 <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">
                     Selamat datang kembali, {{ Auth::user()->name }}!
@@ -22,12 +21,13 @@
                 </p>
             </div>
 
-            <!-- Ringkasan Cepat & Tindakan -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border-l-4 border-red-500">
-                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Status Sistem</p>
-                    <p class="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-2">Aktif (RBAC)</p>
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Spatie Laravel Permission aktif</p>
+                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Manajemen Akun</p>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-2">Kelola Pengguna</p>
+                    <a href="{{ route('admin.users.index') }}" class="inline-block mt-2 text-xs font-semibold text-red-600 dark:text-red-400 hover:underline">
+                        Atur Role &amp; Blokir Pengguna &rarr;
+                    </a>
                 </div>
 
                 <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border-l-4 border-indigo-500">
@@ -41,7 +41,7 @@
                 <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border-l-4 border-emerald-500">
                     <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Hak Akses Role</p>
                     <p class="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-2">Full Permissions</p>
-                    <p class="text-xs text-emerald-600 dark:text-emerald-400 mt-1">6 Permission Terdaftar</p>
+                    <p class="text-xs text-emerald-600 dark:text-emerald-400 mt-1">Spatie Laravel Permission aktif</p>
                 </div>
             </div>
         </div>

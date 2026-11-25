@@ -9,9 +9,16 @@ class LaporanController extends Controller
 {
     public function index(): View
     {
-        // Rekapitulasi per Kategori menggunakan DB::table()->leftJoin()->groupBy()
-        $rekapPerKategori = DB::table('kategori_wisatas')
-            ->leftJoin('wisatas', 'kategori_wisatas.id', '=', 'wisatas.kategori_wisata_id')
+        $user = auth()->user();
+        $isPengelola = $user->hasRole('pengelola');
+
+        $rekapQuery = DB::table('kategori_wisatas')
+            ->leftJoin('wisatas', function ($join) use ($isPengelola, $user) {
+                $join->on('kategori_wisatas.id', '=', 'wisatas.kategori_wisata_id');
+                if ($isPengelola) {
+                    $join->where('wisatas.user_id', '=', $user->id);
+                }
+            })
             ->leftJoin('pemesanans', 'wisatas.id', '=', 'pemesanans.wisata_id')
             ->select(
                 'kategori_wisatas.id',
@@ -21,13 +28,25 @@ class LaporanController extends Controller
                 DB::raw('COALESCE(SUM(pemesanans.total_harga), 0) as total_pendapatan')
             )
             ->groupBy('kategori_wisatas.id', 'kategori_wisatas.nama')
-            ->orderByDesc('total_pendapatan')
-            ->get();
+            ->orderByDesc('total_pendapatan');
 
-        // Ringkasan Global
-        $totalWisata = DB::table('wisatas')->count();
-        $totalTiket = DB::table('pemesanans')->sum('jumlah_tiket') ?? 0;
-        $totalPendapatan = DB::table('pemesanans')->sum('total_harga') ?? 0;
+        $rekapPerKategori = $rekapQuery->get();
+
+        if ($isPengelola) {
+            $totalWisata = DB::table('wisatas')->where('user_id', $user->id)->count();
+            $totalTiket = DB::table('pemesanans')
+                ->join('wisatas', 'pemesanans.wisata_id', '=', 'wisatas.id')
+                ->where('wisatas.user_id', $user->id)
+                ->sum('pemesanans.jumlah_tiket') ?? 0;
+            $totalPendapatan = DB::table('pemesanans')
+                ->join('wisatas', 'pemesanans.wisata_id', '=', 'wisatas.id')
+                ->where('wisatas.user_id', $user->id)
+                ->sum('pemesanans.total_harga') ?? 0;
+        } else {
+            $totalWisata = DB::table('wisatas')->count();
+            $totalTiket = DB::table('pemesanans')->sum('jumlah_tiket') ?? 0;
+            $totalPendapatan = DB::table('pemesanans')->sum('total_harga') ?? 0;
+        }
 
         return view('laporan.index', compact('rekapPerKategori', 'totalWisata', 'totalTiket', 'totalPendapatan'));
     }
