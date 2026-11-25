@@ -11,6 +11,9 @@ Route::get('/', function () {
     return redirect()->route('wisata.index');
 });
 
+// Halaman Klien Konsumsi REST API (Vanilla JS Fetch API)
+Route::view('/klien-api', 'klien.wisata')->name('klien.api');
+
 // Redirect otomatis dari /dashboard berdasarkan role
 Route::get('/dashboard', function () {
     $user = auth()->user();
