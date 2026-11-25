@@ -33,6 +33,11 @@ class UserSeeder extends Seeder
                 'role' => 'pengelola',
             ],
             [
+                'name' => 'Petugas Loket',
+                'email' => 'petugas@gmail.com',
+                'role' => 'petugas',
+            ],
+            [
                 'name' => 'Wisatawan Satu',
                 'email' => 'wisatawan1@gmail.com',
                 'role' => 'wisatawan',

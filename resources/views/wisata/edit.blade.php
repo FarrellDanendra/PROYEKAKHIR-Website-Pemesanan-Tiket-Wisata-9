@@ -11,7 +11,7 @@
                 <form action="{{ route('wisata.update', $wisata) }}" method="POST" enctype="multipart/form-data">
                     @csrf
                     @method('PUT')
-                    @include('wisata._form', ['wisata' => $wisata])
+                    @include('wisata.form', ['wisata' => $wisata])
                 </form>
             </div>
         </div>

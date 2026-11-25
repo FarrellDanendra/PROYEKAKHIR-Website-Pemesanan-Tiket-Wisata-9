@@ -9,13 +9,14 @@ use App\Models\KategoriWisata;
 use App\Models\Wisata;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class WisataController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request): View|Response
     {
         $query = Wisata::with(['kategori', 'fasilitas', 'pengelola'])
             ->withCount('pemesanans');
@@ -24,10 +25,11 @@ class WisataController extends Controller
         if ($request->filled('cari')) {
             $cari = $request->input('cari');
             $query->where(function ($q) use ($cari) {
-                $q->where('nama', 'like', "%{$cari}%")
-                  ->orWhere('lokasi', 'like', "%{$cari}%")
-                  ->orWhere('deskripsi', 'like', "%{$cari}%")
-                  ->orWhere('kode_wisata', 'like', "%{$cari}%");
+                $q
+                    ->where('nama', 'like', "%{$cari}%")
+                    ->orWhere('lokasi', 'like', "%{$cari}%")
+                    ->orWhere('deskripsi', 'like', "%{$cari}%")
+                    ->orWhere('kode_wisata', 'like', "%{$cari}%");
             });
         }
 
@@ -50,7 +52,9 @@ class WisataController extends Controller
 
         $wisatas = $query->paginate(10)->withQueryString();
         $kategoris = KategoriWisata::orderBy('nama')->get();
-
+        if ($request->ajax()) {
+            return response()->view('wisata.list', compact('wisatas'));
+        }
         return view('wisata.index', compact('wisatas', 'kategoris', 'sort', 'order'));
     }
 
@@ -68,7 +72,7 @@ class WisataController extends Controller
 
         $wisata = new Wisata();
         $wisata->fill($validated);
-        
+
         // Mengisi user_id secara eksplisit dari user yang sedang login
         $wisata->user_id = $request->user()->id;
         $wisata->slug = Str::slug($validated['nama']) . '-' . Str::lower(Str::random(5));
@@ -90,22 +94,60 @@ class WisataController extends Controller
 
     public function show(Wisata $wisata): View
     {
-        $wisata->load(['kategori', 'fasilitas', 'pengelola', 'pemesanans.user']);
+        $wisata->load(['kategori', 'fasilitas', 'pengelola']);
 
-        return view('wisata.show', compact('wisata'));
+        $namaHari = [
+            0 => 'Minggu',
+            1 => 'Senin',
+            2 => 'Selasa',
+            3 => 'Rabu',
+            4 => 'Kamis',
+            5 => 'Jumat',
+            6 => 'Sabtu',
+        ];
+        $namaBulan = [
+            1 => 'Jan',
+            2 => 'Feb',
+            3 => 'Mar',
+            4 => 'Apr',
+            5 => 'Mei',
+            6 => 'Jun',
+            7 => 'Jul',
+            8 => 'Agu',
+            9 => 'Sep',
+            10 => 'Okt',
+            11 => 'Nov',
+            12 => 'Des',
+        ];
+
+        $start = \Carbon\Carbon::today();
+        $end = \Carbon\Carbon::today()->endOfMonth();
+        $tanggalTersedia = [];
+
+        for ($date = $start->copy(); $date->lte($end); $date->addDay()) {
+            $tanggalTersedia[] = [
+                'value' => $date->toDateString(),
+                'hari' => $namaHari[$date->dayOfWeek],
+                'angka' => $date->format('d'),
+                'bulan' => $namaBulan[$date->month],
+            ];
+        }
+
+        return view('wisata.show', compact('wisata', 'tanggalTersedia'));
     }
 
-    public function edit(Wisata $wisata): View
+    public function edit(Request $request, Wisata $wisata): View
     {
+        $this->authorizeOwnership($request, $wisata);
         $wisata->load('fasilitas');
         $kategoris = KategoriWisata::orderBy('nama')->get();
         $fasilitas = Fasilitas::orderBy('nama')->get();
-
         return view('wisata.edit', compact('wisata', 'kategoris', 'fasilitas'));
     }
 
     public function update(UpdateWisataRequest $request, Wisata $wisata): RedirectResponse
     {
+        $this->authorizeOwnership($request, $wisata);
         $validated = $request->validated();
 
         $wisata->fill($validated);
@@ -127,8 +169,9 @@ class WisataController extends Controller
         return redirect()->route('wisata.index')->with('success', 'Destinasi wisata berhasil diperbarui!');
     }
 
-    public function destroy(Wisata $wisata): RedirectResponse
+    public function destroy(Request $request, Wisata $wisata): RedirectResponse
     {
+        $this->authorizeOwnership($request, $wisata);
         if ($wisata->gambar && Storage::disk('public')->exists($wisata->gambar)) {
             Storage::disk('public')->delete($wisata->gambar);
         }
@@ -137,5 +180,13 @@ class WisataController extends Controller
         $wisata->delete();
 
         return redirect()->route('wisata.index')->with('success', 'Destinasi wisata berhasil dihapus!');
+    }
+
+    private function authorizeOwnership(Request $request, Wisata $wisata): void
+    {
+        $user = $request->user();
+        if (!$user->hasRole('admin') && $wisata->user_id !== $user->id) {
+            abort(403, 'Anda tidak memiliki akses untuk mengubah atau menghapus destinasi wisata milik pengelola lain.');
+        }
     }
 }

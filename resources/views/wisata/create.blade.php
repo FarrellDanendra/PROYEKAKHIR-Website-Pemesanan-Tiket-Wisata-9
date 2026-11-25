@@ -10,7 +10,7 @@
             <div class="bg-white dark:bg-gray-800 shadow-sm sm:rounded-lg p-6">
                 <form action="{{ route('wisata.store') }}" method="POST" enctype="multipart/form-data">
                     @csrf
-                    @include('wisata._form')
+                    @include('wisata.form')
                 </form>
             </div>
         </div>

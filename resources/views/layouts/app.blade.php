@@ -32,5 +32,25 @@
                 {{ $slot }}
             </main>
         </div>
+
+        @if (($pendingPaymentCount ?? 0) > 0)
+            <div class="fixed bottom-5 right-5 z-50 w-52 bg-white dark:bg-gray-800 border-2 border-amber-400 rounded-xl shadow-xl p-4 flex flex-col justify-between gap-3">
+                <div class="flex items-start justify-between">
+                    <span class="text-xs font-bold text-gray-800 dark:text-gray-100 leading-tight">
+                        Pembayaran Pending
+                    </span>
+                    <span class="inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-rose-600 rounded-full">
+                        {{ $pendingPaymentCount }}
+                    </span>
+                </div>
+                <p class="text-[11px] text-gray-500 dark:text-gray-400">
+                    Selesaikan pembayaran sebelum batas waktu 5 menit habis.
+                </p>
+                <a href="{{ route('pemesanan.index') }}"
+                   class="w-full text-center px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-lg transition">
+                    Bayar
+                </a>
+            </div>
+        @endif
     </body>
 </html>

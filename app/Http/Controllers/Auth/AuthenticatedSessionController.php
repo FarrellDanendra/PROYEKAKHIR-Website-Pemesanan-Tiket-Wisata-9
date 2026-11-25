@@ -28,6 +28,10 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
+        if ($request->user()->hasRole('petugas')) {
+            return redirect()->route('petugas.checkin');
+        }
+
         return redirect()->intended(route('dashboard', absolute: false));
     }
 

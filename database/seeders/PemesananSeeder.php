@@ -43,8 +43,10 @@ class PemesananSeeder extends Seeder
                 'tanggal_kunjungan' => now()->addDays($index + 2)->toDateString(),
                 'jumlah_tiket' => $jumlahTiket,
                 'total_harga' => $wisata->harga_tiket * $jumlahTiket,
-                'status' => $index % 2 === 0 ? 'dikonfirmasi' : 'pending',
+                'status' => $index % 2 === 0 ? 'paid' : 'pending',
                 'catatan' => 'Pemesanan tiket wisata oleh ' . $pembeli->name,
+                'batas_bayar' => $index % 2 === 0 ? null : now()->addMinutes(5),
+                'paid_at' => $index % 2 === 0 ? now() : null
             ]);
 
             $pemesanan->user_id = $pembeli->id;
