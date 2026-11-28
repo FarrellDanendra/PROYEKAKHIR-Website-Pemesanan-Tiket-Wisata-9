@@ -22,16 +22,15 @@ class PemesananController extends Controller
             return;
         }
 
-        if ($user->hasRole('pengelola')) {
-            if ($pemesanan->wisata && $pemesanan->wisata->user_id === $user->id) {
-                return;
-            }
-            abort(403, 'Anda hanya dapat mengelola pemesanan untuk destinasi wisata milik Anda sendiri.');
+        if ($pemesanan->user_id === $user->id) {
+            return;
         }
 
-        if ($pemesanan->user_id !== $user->id) {
-            abort(403, 'Anda tidak memiliki akses ke pemesanan ini.');
+        if ($user->hasRole('pengelola') && $pemesanan->wisata && $pemesanan->wisata->user_id === $user->id) {
+            return;
         }
+
+        abort(403, 'Anda tidak memiliki akses ke data pemesanan ini.');
     }
 
     public function index(Request $request): View
@@ -41,19 +40,28 @@ class PemesananController extends Controller
         $user = $request->user();
         $query = Pemesanan::with(['wisata', 'user'])->latest();
 
+        $tab = $request->query('tab', 'kelola');
+
         if ($user->hasRole('wisatawan')) {
             $query->where('user_id', $user->id);
         } elseif ($user->hasRole('pengelola')) {
-            $query->whereHas('wisata', fn ($q) => $q->where('user_id', $user->id));
+            if ($tab === 'saya') {
+                $query->where('user_id', $user->id);
+            } else {
+                $query->whereHas('wisata', fn ($q) => $q->where('user_id', $user->id));
+            }
+        } elseif ($user->hasRole('admin')) {
+            if ($tab === 'saya') {
+                $query->where('user_id', $user->id);
+            }
         }
 
-        // Pencarian berdasarkan tanggal, bulan, dan destinasi (berlaku semua role)
         if ($request->filled('tanggal')) {
             $query->whereDate('tanggal_kunjungan', $request->input('tanggal'));
         }
 
         if ($request->filled('bulan')) {
-            $bulanInput = $request->input('bulan'); // format YYYY-MM atau 1-12
+            $bulanInput = $request->input('bulan');
             if (str_contains($bulanInput, '-')) {
                 [$tahun, $bulan] = explode('-', $bulanInput);
                 $query->whereYear('tanggal_kunjungan', (int) $tahun)
@@ -69,14 +77,13 @@ class PemesananController extends Controller
 
         $pemesanans = $query->paginate(10)->withQueryString();
 
-        $destinasis = $user->hasRole('pengelola')
+        $destinasis = ($user->hasRole('pengelola') && $tab !== 'saya')
             ? Wisata::where('user_id', $user->id)->orderBy('nama')->get()
             : Wisata::orderBy('nama')->get();
 
-        return view('pemesanan.index', compact('pemesanans', 'destinasis'));
+        return view('pemesanan.index', compact('pemesanans', 'destinasis', 'tab'));
     }
 
-    // Halaman pembayaran dari detail wisata
     public function checkout(Request $request): View|RedirectResponse
     {
         $request->validate([
@@ -86,11 +93,12 @@ class PemesananController extends Controller
         ]);
 
         $wisata = Wisata::findOrFail($request->query('wisata_id'));
-        if (! $wisata->status_buka) {
-            return redirect()->route('wisata.show', $wisata)->with('error', 'Destinasi wisata sedang tutup.');
+        $tanggalKunjungan = $request->query('tanggal_kunjungan');
+
+        if ($wisata->isTutupPadaTanggal($tanggalKunjungan)) {
+            return redirect()->route('wisata.show', $wisata)->with('error', 'Destinasi wisata tutup pada tanggal tersebut. Silakan pilih tanggal lain.');
         }
 
-        $tanggalKunjungan = $request->query('tanggal_kunjungan');
         $jumlahTiket = (int) $request->query('jumlah_tiket', 1);
         $totalHarga = $wisata->harga_tiket * $jumlahTiket;
         $pemesanan = null;
@@ -98,7 +106,6 @@ class PemesananController extends Controller
         return view('pemesanan.pembayaran', compact('wisata', 'tanggalKunjungan', 'jumlahTiket', 'totalHarga', 'pemesanan'));
     }
 
-    // Proses tombol "Bayar" atau "Kembali" dari checkout baru
     public function processCheckout(Request $request): RedirectResponse
     {
         $action = $request->input('action', 'bayar');
@@ -110,9 +117,11 @@ class PemesananController extends Controller
                 'jumlah_tiket' => ['required', 'integer', 'between:1,20'],
                 'nama_pemesan' => ['nullable', 'string', 'max:255'],
                 'email_pemesan' => ['nullable', 'email', 'max:255'],
-                'no_telepon' => ['nullable', 'string', 'max:30'],
+                'no_telepon' => ['nullable', 'regex:/^[0-9]{12,13}$/'],
                 'alamat' => ['nullable', 'string', 'max:500'],
-                'metode_pembayaran' => ['nullable', 'string', 'max:50'],
+                'metode_pembayaran' => ['nullable', 'string', 'max:150'],
+            ], [
+                'no_telepon.regex' => 'Nomor telepon harus berupa angka antara 12 hingga 13 digit.',
             ]);
 
             $wisata = Wisata::findOrFail($validated['wisata_id']);
@@ -135,22 +144,30 @@ class PemesananController extends Controller
             $pemesanan->user_id = $user->id;
             $pemesanan->save();
 
-            return redirect()->route('wisata.index')->with('info', 'Pembayaran berstatus pending. Selesaikan pembayaran dalam 5 menit.');
+            return redirect()->route('pemesanan.index', ['tab' => 'saya'])->with('info', 'Pembayaran berstatus pending. Selesaikan pembayaran dalam 5 menit.');
         }
 
-        // Jika klik tombol "Bayar"
+        // Validasi tombol Bayar: Nomor telepon minimal 12 angka, maksimal 13 angka
         $validated = $request->validate([
             'wisata_id' => ['required', 'exists:wisatas,id'],
             'tanggal_kunjungan' => ['required', 'date', 'after_or_equal:today'],
             'jumlah_tiket' => ['required', 'integer', 'between:1,20'],
             'nama_pemesan' => ['required', 'string', 'max:255'],
             'email_pemesan' => ['required', 'email', 'max:255'],
-            'no_telepon' => ['required', 'string', 'max:30'],
+            'no_telepon' => ['required', 'regex:/^[0-9]{12,13}$/'],
             'alamat' => ['required', 'string', 'max:500'],
-            'metode_pembayaran' => ['required', 'in:transfer_bank,qris,e_wallet,virtual_account'],
+            'metode_pembayaran' => ['required', 'string', 'max:150'],
+        ], [
+            'no_telepon.required' => 'Nomor telepon wajib diisi.',
+            'no_telepon.regex' => 'Nomor telepon wajib diisi minimal 12 angka dan maksimal 13 angka (hanya angka).',
+            'metode_pembayaran.required' => 'Silakan pilih salah satu metode pembayaran yang tersedia.',
         ]);
 
         $wisata = Wisata::findOrFail($validated['wisata_id']);
+
+        if ($wisata->isTutupPadaTanggal($validated['tanggal_kunjungan'])) {
+            return redirect()->route('wisata.show', $wisata)->with('error', 'Destinasi wisata tutup pada tanggal tersebut.');
+        }
 
         $pemesanan = new Pemesanan([
             'kode_tiket' => 'TKT-' . strtoupper(Str::random(8)),
@@ -170,10 +187,9 @@ class PemesananController extends Controller
         $pemesanan->user_id = $request->user()->id;
         $pemesanan->save();
 
-        return redirect()->route('pemesanan.index')->with('success', 'Pembayaran berhasil! Kode Tiket Anda: ' . $pemesanan->kode_tiket);
+        return redirect()->route('pemesanan.index', ['tab' => 'saya'])->with('success', 'Pembayaran berhasil! Kode Tiket Anda: ' . $pemesanan->kode_tiket);
     }
 
-    // Halaman pembayaran untuk tiket yang sudah berstatus pending
     public function payPending(Request $request, Pemesanan $pemesanan): View|RedirectResponse
     {
         Pemesanan::syncExpiredStatuses();
@@ -181,7 +197,7 @@ class PemesananController extends Controller
         $this->authorizeAccess($request, $pemesanan);
 
         if (! $pemesanan->isPendingActive()) {
-            return redirect()->route('pemesanan.index')->with('error', 'Pemesanan tidak dapat dibayar atau batas waktu 5 menit telah habis.');
+            return redirect()->route('pemesanan.index', ['tab' => 'saya'])->with('error', 'Pemesanan tidak dapat dibayar atau batas waktu 5 menit telah habis.');
         }
 
         $wisata = $pemesanan->wisata;
@@ -192,7 +208,6 @@ class PemesananController extends Controller
         return view('pemesanan.pembayaran', compact('wisata', 'tanggalKunjungan', 'jumlahTiket', 'totalHarga', 'pemesanan'));
     }
 
-    // Proses pembayaran tiket pending
     public function processPending(Request $request, Pemesanan $pemesanan): RedirectResponse
     {
         Pemesanan::syncExpiredStatuses();
@@ -200,19 +215,22 @@ class PemesananController extends Controller
         $this->authorizeAccess($request, $pemesanan);
 
         if (! $pemesanan->isPendingActive()) {
-            return redirect()->route('pemesanan.index')->with('error', 'Batas waktu pembayaran 5 menit telah habis.');
+            return redirect()->route('pemesanan.index', ['tab' => 'saya'])->with('error', 'Batas waktu pembayaran 5 menit telah habis.');
         }
 
         if ($request->input('action') === 'kembali') {
-            return redirect()->route('wisata.index');
+            return redirect()->route('pemesanan.index', ['tab' => 'saya']);
         }
 
         $validated = $request->validate([
             'nama_pemesan' => ['required', 'string', 'max:255'],
             'email_pemesan' => ['required', 'email', 'max:255'],
-            'no_telepon' => ['required', 'string', 'max:30'],
+            'no_telepon' => ['required', 'regex:/^[0-9]{12,13}$/'],
             'alamat' => ['required', 'string', 'max:500'],
-            'metode_pembayaran' => ['required', 'in:transfer_bank,qris,e_wallet,virtual_account'],
+            'metode_pembayaran' => ['required', 'string', 'max:150'],
+        ], [
+            'no_telepon.required' => 'Nomor telepon wajib diisi.',
+            'no_telepon.regex' => 'Nomor telepon wajib diisi minimal 12 angka dan maksimal 13 angka (hanya angka).',
         ]);
 
         $pemesanan->update([
@@ -226,7 +244,7 @@ class PemesananController extends Controller
             'paid_at' => Carbon::now(),
         ]);
 
-        return redirect()->route('pemesanan.index')->with('success', 'Pembayaran tiket ' . $pemesanan->kode_tiket . ' berhasil!');
+        return redirect()->route('pemesanan.index', ['tab' => 'saya'])->with('success', 'Pembayaran tiket ' . $pemesanan->kode_tiket . ' berhasil!');
     }
 
     public function show(Request $request, Pemesanan $pemesanan): View
@@ -239,7 +257,6 @@ class PemesananController extends Controller
         return view('pemesanan.show', compact('pemesanan'));
     }
 
-    // Cetak Invoice PDF (hanya jika sudah paid / sudah_digunakan)
     public function invoice(Request $request, Pemesanan $pemesanan): Response|RedirectResponse
     {
         Pemesanan::syncExpiredStatuses();
@@ -256,7 +273,6 @@ class PemesananController extends Controller
         return $pdf->download('invoice-' . $pemesanan->kode_tiket . '.pdf');
     }
 
-    // Form Pengajuan Refund (Wisatawan)
     public function refundForm(Request $request, Pemesanan $pemesanan): View|RedirectResponse
     {
         Pemesanan::syncExpiredStatuses();
@@ -303,7 +319,6 @@ class PemesananController extends Controller
         return redirect()->route('pemesanan.index')->with('success', 'Pengajuan refund untuk tiket ' . $pemesanan->kode_tiket . ' telah dikirim.');
     }
 
-    // Persetujuan / Penolakan Refund oleh Admin atau Pengelola pemilik wisata
     public function refundDecision(Request $request, Pemesanan $pemesanan): RedirectResponse
     {
         $this->authorizeAccess($request, $pemesanan);

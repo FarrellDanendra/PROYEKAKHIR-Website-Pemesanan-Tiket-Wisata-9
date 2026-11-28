@@ -65,14 +65,19 @@
                         @error('email_pemesan') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
                     </div>
 
+                    <!-- NOMOR TELEPON: MINIMAL 12 DIGIT, MAKSIMAL 13 DIGIT ANGKA -->
                     <div>
                         <label for="no_telepon" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                             Nomor Telepon <span class="text-red-500">*</span>
+                            <span class="text-xs text-rose-500 font-bold">(Minimal 12 digit, maksimal 13 digit)</span>
                         </label>
                         <input type="text" name="no_telepon" id="no_telepon" required
-                               placeholder="08xxxxxxxxxx"
+                               minlength="12" maxlength="13" pattern="[0-9]{12,13}"
+                               oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 13);"
+                               placeholder="Contoh: 081234567890 (12 atau 13 digit)"
                                value="{{ old('no_telepon', $pemesanan->no_telepon ?? '') }}"
                                class="mt-1 block w-full rounded-md border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-white shadow-sm sm:text-sm">
+                        <p class="mt-1 text-[11px] text-gray-500">Nomor HP aktif Anda, hanya boleh berupa angka (12 s/d 13 digit).</p>
                         @error('no_telepon') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
                     </div>
 
@@ -88,24 +93,33 @@
 
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Metode Pembayaran <span class="text-red-500">*</span>
+                            Pilih Metode Pembayaran <span class="text-red-500">*</span>
                         </label>
+
                         @php
-                            $metodeList = [
-                                'transfer_bank' => 'Transfer Bank (BCA / BRI / Mandiri)',
-                                'qris' => 'QRIS',
-                                'e_wallet' => 'E-Wallet (GoPay / OVO / DANA)',
-                                'virtual_account' => 'Virtual Account',
-                            ];
+                            $metodeTersedia = is_array($wisata->metode_pembayaran) && count($wisata->metode_pembayaran) > 0
+                                ? $wisata->metode_pembayaran
+                                : [
+                                    ['nama' => 'Transfer Bank (BCA)', 'nomor' => 'Rek: 123-456-7890 a/n Pengelola'],
+                                    ['nama' => 'QRIS', 'nomor' => 'Scan QRIS di Lokasi / Aplikasi'],
+                                    ['nama' => 'E-Wallet (DANA / OVO)', 'nomor' => '081234567890'],
+                                ];
                             $selectedMetode = old('metode_pembayaran', $pemesanan->metode_pembayaran ?? '');
                         @endphp
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            @foreach ($metodeList as $val => $label)
-                                <label class="flex items-center space-x-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 dark:border-gray-600">
-                                    <input type="radio" name="metode_pembayaran" value="{{ $val }}"
-                                           {{ $selectedMetode === $val ? 'checked' : '' }} required
-                                           class="text-emerald-600 focus:ring-emerald-500">
-                                    <span class="text-sm font-medium text-gray-700 dark:text-gray-200">{{ $label }}</span>
+
+                        <div class="grid grid-cols-1 gap-3">
+                            @foreach ($metodeTersedia as $m)
+                                @php
+                                    $valString = $m['nama'] . ' (' . $m['nomor'] . ')';
+                                @endphp
+                                <label class="flex items-start space-x-3 p-3.5 border rounded-xl cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 dark:border-gray-600 transition">
+                                    <input type="radio" name="metode_pembayaran" value="{{ $valString }}"
+                                           {{ $selectedMetode === $valString ? 'checked' : '' }} required
+                                           class="mt-1 text-emerald-600 focus:ring-emerald-500">
+                                    <div class="flex-1">
+                                        <span class="block text-sm font-bold text-gray-900 dark:text-gray-100">{{ $m['nama'] }}</span>
+                                        <span class="block text-xs font-mono text-emerald-600 dark:text-emerald-400 mt-0.5">{{ $m['nomor'] }}</span>
+                                    </div>
                                 </label>
                             @endforeach
                         </div>
@@ -138,7 +152,7 @@
                 if (diff <= 0) {
                     clearInterval(interval);
                     el.textContent = 'Waktu Habis';
-                    window.location.href = "{{ route('pemesanan.index') }}";
+                    window.location.href = "{{ route('pemesanan.index', ['tab' => 'saya']) }}";
                     return;
                 }
                 const m = Math.floor(diff / 60000);

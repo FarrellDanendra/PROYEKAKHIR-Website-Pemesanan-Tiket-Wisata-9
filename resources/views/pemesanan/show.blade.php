@@ -23,7 +23,27 @@
                 </div>
             @endif
 
-            <!-- Batas Waktu Pembayaran (Hanya tampil jika status masih pending, hilang jika sudah paid) -->
+            <!-- Pemberitahuan Khusus Jika Tiket Berstatus Refund Berhasil (Karena Wisata Ditutup atau Dihapus) -->
+            @if ($pemesanan->status === 'refund_berhasil')
+                <div class="p-5 bg-blue-50 dark:bg-blue-900/30 border-l-4 border-blue-500 rounded-lg shadow-sm">
+                    <div class="flex items-start">
+                        <div class="text-blue-500 mr-3 text-2xl">ℹ️</div>
+                        <div>
+                            <h4 class="text-sm font-bold text-blue-900 dark:text-blue-200 uppercase tracking-wide">Pemberitahuan Pengembalian Dana (Refund Berhasil)</h4>
+                            <p class="text-sm text-blue-800 dark:text-blue-300 mt-1 leading-relaxed">
+                                {{ $pemesanan->alasan_refund ?? 'Tiket ini telah dikembalikan (refund) oleh sistem.' }}
+                            </p>
+                            @if ($pemesanan->refund_processed_at)
+                                <p class="text-xs text-blue-600 dark:text-blue-400 mt-2">
+                                    Diproses pada: {{ $pemesanan->refund_processed_at->format('d M Y H:i') }} WIB
+                                </p>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            @endif
+
+            <!-- Batas Waktu Pembayaran (Tampil jika status pending) -->
             @if ($pemesanan->status === 'pending' && $pemesanan->batas_bayar)
                 <div class="p-4 bg-amber-50 border-l-4 border-amber-500 rounded-md flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
@@ -33,7 +53,7 @@
                             (<span id="detail-countdown" class="font-mono font-bold text-rose-600">...</span>)
                         </p>
                     </div>
-                    @if (auth()->user()->hasRole('wisatawan') && $pemesanan->isPendingActive())
+                    @if ($pemesanan->user_id === auth()->id() && $pemesanan->isPendingActive())
                         <a href="{{ route('pemesanan.pay', $pemesanan) }}" class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-md">
                             Bayar Sekarang
                         </a>
@@ -69,7 +89,7 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                     <div>
                         <p class="text-gray-500">Destinasi Wisata</p>
-                        <p class="font-bold text-gray-900 dark:text-gray-100">{{ $pemesanan->wisata->nama ?? '-' }}</p>
+                        <p class="font-bold text-gray-900 dark:text-gray-100">{{ $pemesanan->wisata->nama ?? 'Wisata Dihapus' }}</p>
                     </div>
                     <div>
                         <p class="text-gray-500">Tanggal Kunjungan</p>
@@ -113,7 +133,7 @@
                     @endif
                 </div>
 
-                @if ($pemesanan->alasan_refund)
+                @if ($pemesanan->alasan_refund && $pemesanan->status !== 'refund_berhasil')
                     <div class="p-4 bg-purple-50 dark:bg-purple-900/30 rounded-lg border border-purple-200">
                         <p class="text-xs text-purple-700 font-semibold uppercase">Alasan Pengajuan Refund</p>
                         <p class="text-sm text-gray-800 dark:text-gray-200 mt-1">{{ $pemesanan->alasan_refund }}</p>

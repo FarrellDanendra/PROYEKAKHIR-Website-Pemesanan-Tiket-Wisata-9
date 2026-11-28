@@ -6,7 +6,9 @@ use App\Http\Requests\StoreWisataRequest;
 use App\Http\Requests\UpdateWisataRequest;
 use App\Models\Fasilitas;
 use App\Models\KategoriWisata;
+use App\Models\Pemesanan;
 use App\Models\Wisata;
+use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -21,7 +23,6 @@ class WisataController extends Controller
         $query = Wisata::with(['kategori', 'fasilitas', 'pengelola'])
             ->withCount('pemesanans');
 
-        // 1. Pencarian Kata Kunci
         if ($request->filled('cari')) {
             $cari = $request->input('cari');
             $query->where(function ($q) use ($cari) {
@@ -33,17 +34,19 @@ class WisataController extends Controller
             });
         }
 
-        // 2. Filter Kategori
         if ($request->filled('kategori_id')) {
             $query->where('kategori_wisata_id', $request->input('kategori_id'));
         }
 
-        // 3. Filter Checkbox Status Buka (menggunakan scopeBuka)
         if ($request->boolean('hanya_buka')) {
             $query->buka();
         }
 
-        // 4. Whitelist Sorting Aman
+        $user = $request->user();
+        if ($user && $user->hasRole('pengelola')) {
+            $query->orderByRaw('CASE WHEN user_id = ? THEN 0 ELSE 1 END', [$user->id]);
+        }
+
         $whitelistKolom = ['nama', 'harga_tiket', 'created_at'];
         $sort = in_array($request->query('sort'), $whitelistKolom) ? $request->query('sort') : 'created_at';
         $order = in_array(strtolower($request->query('order', '')), ['asc', 'desc']) ? strtolower($request->query('order')) : 'desc';
@@ -52,9 +55,11 @@ class WisataController extends Controller
 
         $wisatas = $query->paginate(10)->withQueryString();
         $kategoris = KategoriWisata::orderBy('nama')->get();
+
         if ($request->ajax()) {
             return response()->view('wisata.list', compact('wisatas'));
         }
+
         return view('wisata.index', compact('wisatas', 'kategoris', 'sort', 'order'));
     }
 
@@ -70,26 +75,50 @@ class WisataController extends Controller
     {
         $validated = $request->validated();
 
+        $fasilitasIds = $request->input('fasilitas', []);
+        $fasilitasLainnya = $request->input('fasilitas_lainnya');
+
+        // Susun array metode pembayaran custom
+        $metodeList = [];
+        $namas = $request->input('metode_nama', []);
+        $nomors = $request->input('metode_nomor', []);
+        foreach ($namas as $i => $namaMetode) {
+            if (! empty($namaMetode) && ! empty($nomors[$i])) {
+                $metodeList[] = [
+                    'nama' => trim($namaMetode),
+                    'nomor' => trim($nomors[$i]),
+                ];
+            }
+        }
+
+        unset($validated['fasilitas'], $validated['fasilitas_lainnya'], $validated['metode_nama'], $validated['metode_nomor']);
+
         $wisata = new Wisata();
         $wisata->fill($validated);
-
-        // Mengisi user_id secara eksplisit dari user yang sedang login
+        $wisata->metode_pembayaran = $metodeList;
         $wisata->user_id = $request->user()->id;
         $wisata->slug = Str::slug($validated['nama']) . '-' . Str::lower(Str::random(5));
 
-        // Upload Gambar jika ada
         if ($request->hasFile('gambar')) {
             $wisata->gambar = $request->file('gambar')->store('wisata', 'public');
         }
 
         $wisata->save();
 
-        // Sinkronisasi pivot fasilitas
-        if ($request->filled('fasilitas')) {
-            $wisata->fasilitas()->sync($request->input('fasilitas'));
+        if ($fasilitasLainnya) {
+            $tambahan = explode(',', $fasilitasLainnya);
+            foreach ($tambahan as $item) {
+                $namaBersih = trim($item);
+                if ($namaBersih !== '') {
+                    $baru = Fasilitas::firstOrCreate(['nama' => $namaBersih]);
+                    $fasilitasIds[] = $baru->id;
+                }
+            }
         }
 
-        return redirect()->route('wisata.index')->with('success', 'Destinasi wisata berhasil ditambahkan!');
+        $wisata->fasilitas()->sync(array_unique($fasilitasIds));
+
+        return redirect()->route('wisata.index')->with('success', 'Destinasi wisata dan metode pembayaran berhasil ditambahkan!');
     }
 
     public function show(Wisata $wisata): View
@@ -97,39 +126,28 @@ class WisataController extends Controller
         $wisata->load(['kategori', 'fasilitas', 'pengelola']);
 
         $namaHari = [
-            0 => 'Minggu',
-            1 => 'Senin',
-            2 => 'Selasa',
-            3 => 'Rabu',
-            4 => 'Kamis',
-            5 => 'Jumat',
-            6 => 'Sabtu',
+            0 => 'Minggu', 1 => 'Senin', 2 => 'Selasa', 3 => 'Rabu',
+            4 => 'Kamis', 5 => 'Jumat', 6 => 'Sabtu',
         ];
         $namaBulan = [
-            1 => 'Jan',
-            2 => 'Feb',
-            3 => 'Mar',
-            4 => 'Apr',
-            5 => 'Mei',
-            6 => 'Jun',
-            7 => 'Jul',
-            8 => 'Agu',
-            9 => 'Sep',
-            10 => 'Okt',
-            11 => 'Nov',
-            12 => 'Des',
+            1 => 'Jan', 2 => 'Feb', 3 => 'Mar', 4 => 'Apr', 5 => 'Mei', 6 => 'Jun',
+            7 => 'Jul', 8 => 'Agu', 9 => 'Sep', 10 => 'Okt', 11 => 'Nov', 12 => 'Des',
         ];
 
-        $start = \Carbon\Carbon::today();
-        $end = \Carbon\Carbon::today()->endOfMonth();
+        $start = Carbon::today();
+        $end = Carbon::today()->endOfMonth();
         $tanggalTersedia = [];
 
         for ($date = $start->copy(); $date->lte($end); $date->addDay()) {
+            $tglStr = $date->toDateString();
+            $isTutup = $wisata->isTutupPadaTanggal($tglStr);
+
             $tanggalTersedia[] = [
-                'value' => $date->toDateString(),
+                'value' => $tglStr,
                 'hari' => $namaHari[$date->dayOfWeek],
                 'angka' => $date->format('d'),
                 'bulan' => $namaBulan[$date->month],
+                'is_tutup' => $isTutup,
             ];
         }
 
@@ -142,6 +160,7 @@ class WisataController extends Controller
         $wisata->load('fasilitas');
         $kategoris = KategoriWisata::orderBy('nama')->get();
         $fasilitas = Fasilitas::orderBy('nama')->get();
+
         return view('wisata.edit', compact('wisata', 'kategoris', 'fasilitas'));
     }
 
@@ -150,10 +169,27 @@ class WisataController extends Controller
         $this->authorizeOwnership($request, $wisata);
         $validated = $request->validated();
 
+        $fasilitasIds = $request->input('fasilitas', []);
+        $fasilitasLainnya = $request->input('fasilitas_lainnya');
+
+        $metodeList = [];
+        $namas = $request->input('metode_nama', []);
+        $nomors = $request->input('metode_nomor', []);
+        foreach ($namas as $i => $namaMetode) {
+            if (! empty($namaMetode) && ! empty($nomors[$i])) {
+                $metodeList[] = [
+                    'nama' => trim($namaMetode),
+                    'nomor' => trim($nomors[$i]),
+                ];
+            }
+        }
+
+        unset($validated['fasilitas'], $validated['fasilitas_lainnya'], $validated['metode_nama'], $validated['metode_nomor']);
+
         $wisata->fill($validated);
+        $wisata->metode_pembayaran = $metodeList;
         $wisata->slug = Str::slug($validated['nama']) . '-' . Str::lower(Str::random(5));
 
-        // Update Gambar jika ada upload baru
         if ($request->hasFile('gambar')) {
             if ($wisata->gambar && Storage::disk('public')->exists($wisata->gambar)) {
                 Storage::disk('public')->delete($wisata->gambar);
@@ -163,8 +199,43 @@ class WisataController extends Controller
 
         $wisata->save();
 
-        // Sinkronisasi pivot fasilitas
-        $wisata->fasilitas()->sync($request->input('fasilitas', []));
+        if ($fasilitasLainnya) {
+            $tambahan = explode(',', $fasilitasLainnya);
+            foreach ($tambahan as $item) {
+                $namaBersih = trim($item);
+                if ($namaBersih !== '') {
+                    $baru = Fasilitas::firstOrCreate(['nama' => $namaBersih]);
+                    $fasilitasIds[] = $baru->id;
+                }
+            }
+        }
+
+        $wisata->fasilitas()->sync(array_unique($fasilitasIds));
+
+        if ($wisata->tanggal_tutup_mulai) {
+            $mulai = $wisata->tanggal_tutup_mulai->toDateString();
+            $selesai = $wisata->tanggal_tutup_selesai ? $wisata->tanggal_tutup_selesai->toDateString() : $mulai;
+
+            Pemesanan::where('wisata_id', $wisata->id)
+                ->whereIn('status', ['paid', 'pending'])
+                ->whereBetween('tanggal_kunjungan', [$mulai, $selesai])
+                ->update([
+                    'status' => 'refund_berhasil',
+                    'refund_processed_at' => Carbon::now(),
+                    'alasan_refund' => "Tiket Anda otomatis direfund (Refund Berhasil) karena destinasi wisata ditutup pada tanggal kunjungan Anda ({$mulai} s/d {$selesai}) oleh pihak pengelola.",
+                ]);
+        }
+
+        if (! $wisata->status_buka) {
+            Pemesanan::where('wisata_id', $wisata->id)
+                ->whereIn('status', ['paid', 'pending'])
+                ->whereDate('tanggal_kunjungan', '>=', Carbon::today()->toDateString())
+                ->update([
+                    'status' => 'refund_berhasil',
+                    'refund_processed_at' => Carbon::now(),
+                    'alasan_refund' => 'Tiket Anda otomatis direfund (Refund Berhasil) karena destinasi wisata sedang ditutup operasionalnya oleh pihak pengelola.',
+                ]);
+        }
 
         return redirect()->route('wisata.index')->with('success', 'Destinasi wisata berhasil diperbarui!');
     }
@@ -172,6 +243,15 @@ class WisataController extends Controller
     public function destroy(Request $request, Wisata $wisata): RedirectResponse
     {
         $this->authorizeOwnership($request, $wisata);
+
+        Pemesanan::where('wisata_id', $wisata->id)
+            ->whereIn('status', ['paid', 'pending'])
+            ->update([
+                'status' => 'refund_berhasil',
+                'refund_processed_at' => Carbon::now(),
+                'alasan_refund' => 'Tiket Anda otomatis direfund (Refund Berhasil) karena destinasi wisata (' . $wisata->nama . ') telah dihapus oleh pengelola/admin.',
+            ]);
+
         if ($wisata->gambar && Storage::disk('public')->exists($wisata->gambar)) {
             Storage::disk('public')->delete($wisata->gambar);
         }
@@ -179,13 +259,17 @@ class WisataController extends Controller
         $wisata->fasilitas()->detach();
         $wisata->delete();
 
-        return redirect()->route('wisata.index')->with('success', 'Destinasi wisata berhasil dihapus!');
+        return redirect()->route('wisata.index')->with('success', 'Destinasi wisata berhasil dihapus dan tiket terkait otomatis diproses refund!');
     }
 
     private function authorizeOwnership(Request $request, Wisata $wisata): void
     {
         $user = $request->user();
-        if (!$user->hasRole('admin') && $wisata->user_id !== $user->id) {
+        if ($user->hasRole('admin')) {
+            return;
+        }
+
+        if ($wisata->user_id !== $user->id) {
             abort(403, 'Anda tidak memiliki akses untuk mengubah atau menghapus destinasi wisata milik pengelola lain.');
         }
     }

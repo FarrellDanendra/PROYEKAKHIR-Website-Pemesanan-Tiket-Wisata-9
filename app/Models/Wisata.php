@@ -2,16 +2,18 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Wisata extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $table = 'wisatas';
 
@@ -23,10 +25,13 @@ class Wisata extends Model
         'slug',
         'deskripsi',
         'harga_tiket',
+        'metode_pembayaran',
         'lokasi',
         'gambar',
         'status_buka',
         'tanggal_buka',
+        'tanggal_tutup_mulai',
+        'tanggal_tutup_selesai',
     ];
 
     /**
@@ -38,10 +43,14 @@ class Wisata extends Model
     {
         return [
             'harga_tiket' => 'decimal:2',
+            'metode_pembayaran' => 'array',
             'status_buka' => 'boolean',
             'tanggal_buka' => 'date',
+            'tanggal_tutup_mulai' => 'date',
+            'tanggal_tutup_selesai' => 'date',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
+            'deleted_at' => 'datetime',
         ];
     }
 
@@ -51,6 +60,26 @@ class Wisata extends Model
     public function scopeBuka(Builder $query): void
     {
         $query->where('status_buka', true);
+    }
+
+    /**
+     * Cek apakah destinasi tutup pada tanggal tertentu.
+     */
+    public function isTutupPadaTanggal(string|Carbon $tanggal): bool
+    {
+        if (! $this->status_buka) {
+            return true;
+        }
+
+        if (! $this->tanggal_tutup_mulai) {
+            return false;
+        }
+
+        $target = Carbon::parse($tanggal)->toDateString();
+        $mulai = $this->tanggal_tutup_mulai->toDateString();
+        $selesai = $this->tanggal_tutup_selesai ? $this->tanggal_tutup_selesai->toDateString() : $mulai;
+
+        return $target >= $mulai && $target <= $selesai;
     }
 
     public function kategori(): BelongsTo

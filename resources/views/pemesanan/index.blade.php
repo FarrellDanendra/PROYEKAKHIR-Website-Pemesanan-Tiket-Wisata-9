@@ -1,9 +1,22 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex justify-between items-center">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
                 {{ __('Daftar Pemesanan Tiket') }}
             </h2>
+
+            @hasanyrole('admin|pengelola')
+                <div class="inline-flex rounded-md shadow-sm" role="group">
+                    <a href="{{ route('pemesanan.index', ['tab' => 'kelola']) }}"
+                       class="px-4 py-2 text-xs font-bold rounded-l-lg border {{ ($tab ?? 'kelola') === 'kelola' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 hover:bg-gray-50 border-gray-300' }}">
+                        {{ auth()->user()->hasRole('admin') ? 'Semua Pesanan Sistem' : 'Pesanan Masuk Wisata Saya' }}
+                    </a>
+                    <a href="{{ route('pemesanan.index', ['tab' => 'saya']) }}"
+                       class="px-4 py-2 text-xs font-bold rounded-r-lg border-t border-b border-r {{ ($tab ?? '') === 'saya' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 hover:bg-gray-50 border-gray-300' }}">
+                        Tiket Pribadi Saya
+                    </a>
+                </div>
+            @endhasanyrole
         </div>
     </x-slot>
 
@@ -26,9 +39,11 @@
                 </div>
             @endif
 
-            <!-- Form Pencarian Tanggal, Bulan, Destinasi (Berlaku Semua Role) -->
+            <!-- Form Filter Pencarian -->
             <div class="bg-white dark:bg-gray-800 shadow-sm sm:rounded-lg p-6">
                 <form action="{{ route('pemesanan.index') }}" method="GET" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                    <input type="hidden" name="tab" value="{{ $tab ?? 'kelola' }}">
+
                     <div>
                         <label for="tanggal" class="block text-xs font-semibold uppercase text-gray-600 dark:text-gray-400">Tanggal Kunjungan</label>
                         <input type="date" name="tanggal" id="tanggal" value="{{ request('tanggal') }}"
@@ -58,7 +73,7 @@
                         <button type="submit" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-md shadow-sm">
                             Cari
                         </button>
-                        <a href="{{ route('pemesanan.index') }}" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-sm font-semibold rounded-md hover:bg-gray-300">
+                        <a href="{{ route('pemesanan.index', ['tab' => $tab ?? 'kelola']) }}" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-sm font-semibold rounded-md hover:bg-gray-300">
                             Reset
                         </a>
                     </div>
@@ -82,7 +97,7 @@
                         @forelse ($pemesanans as $p)
                             <tr>
                                 <td class="px-6 py-4 font-mono font-bold text-sm text-indigo-600 dark:text-indigo-400">{{ $p->kode_tiket }}</td>
-                                <td class="px-6 py-4 text-sm font-semibold text-gray-900 dark:text-gray-100">{{ $p->wisata->nama ?? '-' }}</td>
+                                <td class="px-6 py-4 text-sm font-semibold text-gray-900 dark:text-gray-100">{{ $p->wisata->nama ?? 'Wisata Dihapus' }}</td>
                                 <td class="px-6 py-4 text-sm text-gray-500">{{ $p->nama_pemesan ?? $p->user->name ?? '-' }}</td>
                                 <td class="px-6 py-4 text-sm text-gray-500">{{ $p->tanggal_kunjungan->format('d M Y') }}</td>
                                 <td class="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
@@ -108,7 +123,7 @@
                                 <td class="px-6 py-4 text-xs text-right space-x-2 whitespace-nowrap">
                                     <a href="{{ route('pemesanan.show', $p) }}" class="text-indigo-600 hover:underline font-semibold">Detail</a>
 
-                                    @if ($p->isPendingActive() && auth()->user()->hasRole('wisatawan'))
+                                    @if ($p->isPendingActive() && $p->user_id === auth()->id())
                                         <a href="{{ route('pemesanan.pay', $p) }}" class="inline-block px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded font-semibold">
                                             Bayar
                                         </a>
@@ -116,7 +131,7 @@
 
                                     @if ($p->status === 'paid')
                                         <a href="{{ route('pemesanan.invoice', $p) }}" class="inline-block px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-semibold">
-                                            Cetak Invoice
+                                            Invoice
                                         </a>
 
                                         @if ($p->isRefundable() && $p->user_id === auth()->id())
@@ -129,7 +144,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="px-6 py-8 text-center text-gray-500">Belum ada riwayat pemesanan tiket.</td>
+                                <td colspan="7" class="px-6 py-8 text-center text-gray-500">Belum ada riwayat pemesanan tiket pada daftar ini.</td>
                             </tr>
                         @endforelse
                     </tbody>
