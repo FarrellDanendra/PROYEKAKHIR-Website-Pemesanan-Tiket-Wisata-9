@@ -87,7 +87,7 @@ class Pemesanan extends Model
 
     public function wisata(): BelongsTo
     {
-        return $this->belongsTo(Wisata::class, 'wisata_id');
+        return $this->belongsTo(Wisata::class, 'wisata_id')->withTrashed();
     }
 
     public function user(): BelongsTo

@@ -63,7 +63,7 @@
                         </div>
                     </div>
 
-                    <!-- Form Pilih Tanggal Bulan Ini + Pesan Sekarang -->
+                    <!-- Form Pilih Tanggal & Pesan Sekarang -->
                     <div class="border-t border-gray-200 dark:border-gray-700 pt-6"
                          x-data="{
                             selectedDate: '{{ $tanggalTersedia[0]['value'] ?? date('Y-m-d') }}',
@@ -71,26 +71,51 @@
                             harga: {{ (int) $wisata->harga_tiket }}
                          }">
                         <h4 class="text-base font-bold text-gray-900 dark:text-gray-100 mb-3">
-                            Pilih Tanggal Kunjungan (Bulan Ini)
+                            Pilih Tanggal Kunjungan
                         </h4>
 
                         <form action="{{ route('pemesanan.checkout') }}" method="GET" class="space-y-6">
                             <input type="hidden" name="wisata_id" value="{{ $wisata->id }}">
                             <input type="hidden" name="tanggal_kunjungan" :value="selectedDate">
 
+                            <!-- Tombol Cepat Tanggal Bulan Ini -->
                             <div class="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-7 gap-3">
                                 @foreach ($tanggalTersedia as $tgl)
-                                    <button type="button"
-                                            @click="selectedDate = '{{ $tgl['value'] }}'"
-                                            :class="selectedDate === '{{ $tgl['value'] }}'
-                                                ? 'bg-emerald-600 text-white border-emerald-600 shadow-md'
-                                                : 'bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-600 hover:border-emerald-400'"
-                                            class="p-3 rounded-xl border text-center transition cursor-pointer flex flex-col items-center">
-                                        <span class="text-[11px] font-medium opacity-80">{{ $tgl['hari'] }}</span>
-                                        <span class="text-xl font-extrabold my-0.5">{{ $tgl['angka'] }}</span>
-                                        <span class="text-xs font-semibold uppercase">{{ $tgl['bulan'] }}</span>
-                                    </button>
+                                    @if ($tgl['is_tutup'])
+                                        <div class="p-3 rounded-xl border border-rose-200 bg-rose-50 dark:bg-rose-900/30 text-rose-400 text-center flex flex-col items-center cursor-not-allowed opacity-60">
+                                            <span class="text-[11px] font-medium">{{ $tgl['hari'] }}</span>
+                                            <span class="text-xl font-extrabold my-0.5 line-through">{{ $tgl['angka'] }}</span>
+                                            <span class="text-[10px] uppercase font-bold text-rose-600">Tutup</span>
+                                        </div>
+                                    @else
+                                        <button type="button"
+                                                @click="selectedDate = '{{ $tgl['value'] }}'"
+                                                :class="selectedDate === '{{ $tgl['value'] }}'
+                                                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-md ring-2 ring-emerald-300'
+                                                    : 'bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-600 hover:border-emerald-400'"
+                                                class="p-3 rounded-xl border text-center transition cursor-pointer flex flex-col items-center">
+                                            <span class="text-[11px] font-medium opacity-80">{{ $tgl['hari'] }}</span>
+                                            <span class="text-xl font-extrabold my-0.5">{{ $tgl['angka'] }}</span>
+                                            <span class="text-xs font-semibold uppercase">{{ $tgl['bulan'] }}</span>
+                                        </button>
+                                    @endif
                                 @endforeach
+                            </div>
+
+                            <!-- Kotak Kalender Bebas / Bulan Depan -->
+                            <div class="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-dashed border-gray-300 dark:border-gray-600 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <div>
+                                    <label for="custom_date" class="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                                        📅 Pilih Tanggal Lewat Kalender (Bisa Pesan Bulan Depan)
+                                    </label>
+                                    <p class="text-xs text-gray-500">Klik ikon kalender untuk memilih tanggal pemesanan bebas di masa depan:</p>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <input type="date" id="custom_date"
+                                           min="{{ date('Y-m-d') }}"
+                                           x-model="selectedDate"
+                                           class="rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                </div>
                             </div>
 
                             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 border-t border-gray-100 dark:border-gray-700">
@@ -100,6 +125,10 @@
                                         <input type="number" name="jumlah_tiket" id="jumlah_tiket" min="1" max="20"
                                                x-model.number="jumlahTiket"
                                                class="mt-1 w-24 rounded-md border-gray-300 dark:bg-gray-700 dark:text-white text-sm">
+                                    </div>
+                                    <div>
+                                        <p class="text-xs font-semibold text-gray-500">Tanggal Terpilih</p>
+                                        <p class="text-sm font-bold text-gray-800 dark:text-gray-200" x-text="selectedDate"></p>
                                     </div>
                                     <div>
                                         <p class="text-xs font-semibold text-gray-500">Total Bayar</p>

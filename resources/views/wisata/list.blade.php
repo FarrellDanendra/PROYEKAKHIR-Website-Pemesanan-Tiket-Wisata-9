@@ -17,22 +17,43 @@
                         <p class="text-xs text-gray-400 mt-1">
                             Kode: <span class="font-mono font-semibold">{{ $w->kode_wisata ?? '-' }}</span> | Pemesanan: {{ $w->pemesanans_count }}x
                         </p>
+
+                        <!-- Label khusus pembeda akun pengelola -->
+                        @if (auth()->check() && auth()->user()->hasRole('pengelola'))
+                            <div class="mt-3">
+                                @if ($w->user_id === auth()->id())
+                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                        ⭐ Dikelola oleh Anda
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">
+                                        Pengelola: {{ $w->pengelola->name ?? 'Lainnya' }}
+                                    </span>
+                                @endif
+                            </div>
+                        @endif
                     </x-kartu-wisata>
                 </a>
 
+                <!-- Tombol Aksi Edit & Hapus (Admin untuk semua, Pengelola untuk miliknya) -->
                 @if (auth()->check() && (auth()->user()->hasRole('admin') || (auth()->user()->hasRole('pengelola') && $w->user_id === auth()->id())))
-                    <div class="p-4 bg-gray-50 dark:bg-gray-800/80 border-t border-gray-100 dark:border-gray-700 flex items-center justify-end space-x-4 text-xs font-semibold">
-                        <a href="{{ route('wisata.edit', $w) }}" class="text-amber-600 hover:underline">
-                            Edit
-                        </a>
+                    <div class="p-4 bg-gray-50 dark:bg-gray-800/80 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between text-xs font-semibold">
+                        <span class="text-gray-400 text-[11px]">
+                            {{ auth()->user()->hasRole('admin') ? 'Akses Admin' : 'Wisata Anda' }}
+                        </span>
+                        <div class="space-x-3">
+                            <a href="{{ route('wisata.edit', $w) }}" class="text-amber-600 hover:underline">
+                                Edit
+                            </a>
 
-                        <form action="{{ route('wisata.destroy', $w) }}" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin menghapus destinasi wisata ini?');">
-                            @csrf
-                            @method('DELETE')
-                            <button type="submit" class="text-red-600 hover:underline">
-                                Hapus
-                            </button>
-                        </form>
+                            <form action="{{ route('wisata.destroy', $w) }}" method="POST" class="inline" onsubmit="return confirm('Apakah Anda yakin ingin menghapus destinasi wisata ini? Semua tiket paid/pending akan otomatis direfund.');">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="text-red-600 hover:underline">
+                                    Hapus
+                                </button>
+                            </form>
+                        </div>
                     </div>
                 @endif
             </div>
